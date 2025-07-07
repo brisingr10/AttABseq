@@ -188,7 +188,7 @@ if __name__ == "__main__":
         i+=1
         print('*************************** start training on Fold %s ***************************'%i)
 
-        with open('/home/ruofan/bcr/cnn3_cv/1101analysis/fold{}.txt'.format(i),'w') as file_fold:
+        with open('../1101analysis/fold{}.txt'.format(i),'w') as file_fold:
             file_fold.write(str(train_index))
             file_fold.write('\n')
             file_fold.write(str(val_index))
@@ -207,12 +207,12 @@ if __name__ == "__main__":
         #dataset_val = torch.utils.data.DataLoader(dataset_val, sampler=torch.utils.data.distributed.DistributedSampler(dataset_val, num_replicas=ngpus_per_node, rank=0))
 
         """Output files."""
-        file_loss_min_PCCS = '../output645/loss_min_result/RECORD_{}.txt'.format(i)
-        file_loss_min_model = '../output645/loss_min_model/model_{}'.format(i)
-        file_best_pcc_PCCS = '../output645/best_pcc_result/RECORD_{}.txt'.format(i)
-        file_best_pcc_model = '../output645/best_pcc_model/model_{}'.format(i)
-        file_best_r2_PCCS = '../output645/best_r2_result/RECORD_{}.txt'.format(i)
-        file_best_r2_model = '../output645/best_r2_model/model_{}'.format(i)
+        file_loss_min_PCCS = '../output1101/loss_min_result/RECORD_{}.txt'.format(i)
+        file_loss_min_model = '../output1101/loss_min_model/model_{}'.format(i)
+        file_best_pcc_PCCS = '../output1101/best_pcc_result/RECORD_{}.txt'.format(i)
+        file_best_pcc_model = '../output1101/best_pcc_model/model_{}'.format(i)
+        file_best_r2_PCCS = '../output1101/best_r2_result/RECORD_{}.txt'.format(i)
+        file_best_r2_model = '../output1101/best_r2_model/model_{}'.format(i)
         
         PCCS = ('Epoch\tTime(sec)\tLoss_train\tLoss_val\tpearson\tMAE\tMSE\tRMSE\tr2')
         print(PCCS)

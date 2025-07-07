@@ -1,10 +1,10 @@
-# AttABseq: An Attention-based Deep Learning Prediction Method for Antigen-Antibody Binding Affinity Changes Based on Protein Sequences
+# AttABseq: 단백질 서열 기반 항원-항체 결합 친화도 변화를 위한 어텐션 기반 딥러닝 예측 방법
 
-## Introduction
+## 소개
 
-AttABseq is an end-to-end sequence-based deep learning model for the predictions of the antigen-antibody binding affinity changes connected with antibody mutations.
+AttABseq는 항체 돌연변이와 연관된 항원-항체 결합 친화도 변화를 예측하기 위한 종단 간 서열 기반 딥러닝 모델입니다.
 
-## Files Architecture
+## 파일 아키텍처
 ```
 AttABseq
 ├── analysis
@@ -87,43 +87,71 @@ AttABseq
 │   │   ├── 1101
 │   │   └── 1131
 ```
-## Usage
+## 사용법
 
-### 1. Environment
-- python 3.7.0
-- pytorch 1.7.0
-- torchvision 0.8.0
-- numpy 1.21.5
-- pandas 1.3.5
-- scikit-learn 1.0.2
-- scipy 1.7.3
-- seaborn 0.12.2
-- matplotlib 3.5.3
-- networkx 2.6.3
-- xarray 0.20.2
+### 1. 환경
+- python 3.7.0+
+- pytorch 2.0.0+
+- torchvision 0.15.0+
+- numpy 1.20.0+
+- pandas 1.3.0+
+- scikit-learn 1.0.0+
+- scipy 1.7.0+
+- seaborn 0.11.0+
+- matplotlib 3.5.0+
+- networkx 2.6.0+
+- xarray 0.20.0+
 
-### 2. Data
+### 2. 데이터
 - k-cv: AB645.csv / AB1101.csv / S1131.csv
-- label-ascending ordered split: AB645order.csv / AB1101order.csv / S1131order.csv
+- 레이블 오름차순 정렬 분할: AB645order.csv / AB1101order.csv / S1131order.csv
 
-### 3. Training
+### 3. 훈련
 ```
-conda activate yourenvironment
-python main.py
+# 가상 환경 활성화 (이미 구성됨)
+python setup_training.py --dataset all
 ```
-You can find your results in the folder "output".
+결과는 "output" 폴더에서 찾을 수 있습니다.
 
-### 4.  Testing
+### 4. 테스트
 ```
-conda activate yourenvironment
+# 가상 환경 활성화 (이미 구성됨)
+cd cross_validation/script
 python predict.py
 ```
-You can find your results in the folder "output".
+결과는 "output" 폴더에서 찾을 수 있습니다.
 
-### 5. Interpretable
+### 5. 해석가능성 분석
 ```
-conda activate yourenvironment
+# 가상 환경 활성화 (이미 구성됨)
+cd interpretability/interpretable/645
 python interpre.py
 ```
-You can find your results in the folder "interpre_csv" & "interpre_heatmap".
+결과는 "interpre_csv" 및 "interpre_heatmap" 폴더에서 찾을 수 있습니다.
+
+## 빠른 시작 (업데이트됨)
+
+### 대화형 모드 (권장)
+```bash
+python start_training.py
+```
+
+### 명령줄 모드
+```bash
+# 모든 데이터셋 훈련
+python setup_training.py --dataset all
+
+# 특정 데이터셋 훈련
+python setup_training.py --dataset AB1101
+python setup_training.py --dataset AB645
+python setup_training.py --dataset S1131
+
+# 설정만 실행
+python setup_training.py --setup-only
+```
+
+### VS Code 작업 (권장)
+`Ctrl+Shift+P` → "Tasks: Run Task" → AttABseq 작업 선택
+
+자세한 정보는 `TRAINING_GUIDE.md` 및 `SETUP_COMPLETE.md`를 참조하세요.
 

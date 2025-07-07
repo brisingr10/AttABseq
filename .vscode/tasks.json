@@ -1,0 +1,91 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "AttABseq: Setup Training Environment",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"setup_training.py",
+				"--setup-only"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Interactive Training Launcher",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"start_training.py"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Train All Datasets",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"setup_training.py",
+				"--dataset",
+				"all"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Train AB1101 Dataset",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"setup_training.py",
+				"--dataset",
+				"AB1101"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Train AB645 Dataset",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"setup_training.py",
+				"--dataset",
+				"AB645"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Train S1131 Dataset",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"setup_training.py",
+				"--dataset",
+				"S1131"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "AttABseq: Show Training Summary",
+			"type": "shell",
+			"command": "C:/Users/ryutop/Desktop/AI_work/AttABseq/.venv/Scripts/python.exe",
+			"args": [
+				"training_summary.py"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
