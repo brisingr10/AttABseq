@@ -61,10 +61,10 @@ class SelfAttention(nn.Module):
         # x = [batch size, sent len_Q, n heads, hid dim // n heads]
 
         x = x.view(bsz, -1, self.hid_dim)
-        # x = [batch size, sent len_Q, hid dim] [8, 145, 768]
+        # x = [batch size, sent len_Q, hid dim]
 
         x = self.fc(x)
-        # x = [batch size, sent len_Q, hid dim] [8, 145, 768]
+        # x = [batch size, sent len_Q, hid dim]
 
         return x
 
@@ -191,12 +191,6 @@ class DecoderLayer(nn.Module):
         trg = self.ln(trg + self.do(self.pf(trg)))
         return trg
 
-POLY_DEGREE = 3
-def make_features(x):
-    """Builds features i.e. a matrix with columns [x, x^2, x^3, x^4]."""
-    x = x.unsqueeze(1)
-    return torch.cat([x ** i for i in range(1, POLY_DEGREE+1)], 1)
-
 class Decoder(nn.Module):
     """ compound feature extraction."""
     def __init__(self, atom_dim, hid_dim, n_layers, n_heads, pf_dim, decoder_layer, self_attention,
@@ -228,7 +222,7 @@ class Decoder(nn.Module):
         # trg = [batch size, compound len, hid dim]
         for layer in self.layers:
             trg = layer(trg, src, trg_mask, src_mask)  # ag:ab
-        # trg = [batch size, compound len, hid dim]  [batch, length, 256*3]
+        # trg = [batch size, compound len, hid dim]
         trg = self.fc(trg)
         """Use norm to determine which atom is significant. """
         norm = F.softmax(torch.norm(trg, dim=2), dim=1)
@@ -240,12 +234,6 @@ class Decoder(nn.Module):
                 v = trg[i, j, ]
                 v = v * norm[i, j]
                 summ[i, ] += v
-        # sum = [batch size,hid_dim]
-        #label = self.fc_1(sum)
-        # label.shape=[batch size, 32]
-        #label = self.fc_2(label)
-        # label.shape=[batch size, 16]
-        #label = self.fc_3(label)
         return summ, norm1
 
 
@@ -279,7 +267,7 @@ class Predictor(nn.Module):
         p21_mask = p21_mask.unsqueeze(1).unsqueeze(2).to(self.device)
         return p11_mask, p21_mask
 
-    def forward(self, ag_s, ab_s, ag_m_s, ab_m_s, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num, itera, correct_interaction, fold):
+    def forward(self, ag_s, ab_s, ag_m_s, ab_m_s, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num):
         # compound = [batch,atom_num,atom_dim]
         # protein = [batch,protein len,protein_dim]
         ag_s_max_len = ag_s.shape[1]
@@ -314,83 +302,23 @@ class Predictor(nn.Module):
         final2 = self.do(F.relu(self.fc_3(final2)))
         final2 = self.do(F.relu(self.fc_4(final2)))
         final2 = final2.view(-1)
-        
-        if os.path.exists('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag{}.txt'.format(fold, itera)):
-            f1 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag{}.txt'.format(fold, itera),'a+')
-            f1.write(str(correct_interaction))
-            f1.write('\n')
-            f1.write(str(ag_ab_norm.tolist()))
-            f1.write('\n')
-        else:
-            f1 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag{}.txt'.format(fold, itera),'w')
-            f1.write(str(correct_interaction))
-            f1.write('\n')
-            f1.write(str(ag_ab_norm.tolist()))
-            f1.write('\n')
-        
-        if os.path.exists('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab{}.txt'.format(fold, itera)):
-            f2 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab{}.txt'.format(fold, itera),'a+')
-            f2.write(str(correct_interaction))
-            f2.write('\n')
-            f2.write(str(ab_ag_norm.tolist()))
-            f2.write('\n')
-        else:
-            f2 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab{}.txt'.format(fold, itera),'w')
-            f2.write(str(correct_interaction))
-            f2.write('\n')
-            f2.write(str(ab_ag_norm.tolist()))
-            f2.write('\n')
-        
-        if os.path.exists('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag_mut{}.txt'.format(fold, itera)):
-            f3 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag_mut{}.txt'.format(fold, itera),'a+')
-            f3.write(str(correct_interaction))
-            f3.write('\n')
-            f3.write(str(ag_ab_m_norm.tolist()))
-            f3.write('\n')
-        else:
-            f3 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ag_mut{}.txt'.format(fold, itera),'w')
-            f3.write(str(correct_interaction))
-            f3.write('\n')
-            f3.write(str(ag_ab_m_norm.tolist()))
-            f3.write('\n')
-        
-        if os.path.exists('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab_mut{}.txt'.format(fold, itera)):
-            f4 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab_mut{}.txt'.format(fold, itera),'a+')
-            f4.write(str(correct_interaction))
-            f4.write('\n')
-            f4.write(str(ab_ag_m_norm.tolist()))
-            f4.write('\n')
-        else:
-            f4 = open('/home/ruofan/bcr/cnn3_cv/645analysis/fold{}/ab_mut{}.txt'.format(fold, itera),'w')
-            f4.write(str(correct_interaction))
-            f4.write('\n')
-            f4.write(str(ab_ag_m_norm.tolist()))
-            f4.write('\n')
 
-        return final2
+        return final2, ag_ab_norm, ab_ag_norm, ag_ab_m_norm, ab_ag_m_norm
 
-    def __call__(self, data, itera, fold, train=True):
+    def __call__(self, data, train=True):
 
         ag_s, ab_s, ag_m_s, ab_m_s, correct_interaction, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num = data
 
         Loss = nn.MSELoss()
-        # Loss = nn.CrossEntropyLoss()
         correct_interaction = correct_interaction.to(torch.float32)
-        #correct_interaction = correct_interaction.unsqueeze(1)
 
+        predicted_interaction, _, _, _, _ = self.forward(ag_s, ab_s, ag_m_s, ab_m_s, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num)
+        
         if train:
-            predicted_interaction = self.forward(ag_s, ab_s, ag_m_s, ab_m_s, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num, itera, correct_interaction, fold)
             loss = Loss(predicted_interaction, correct_interaction)
             loss = loss.float()
-            #correct_labels = correct_interaction.to('cpu').data.numpy()
-            #predicted_labels = predicted_interaction.to('cpu').data.numpy()
             return loss, correct_interaction, predicted_interaction
-            #return loss
-
         else:
-            predicted_interaction = self.forward(ag_s, ab_s, ag_m_s, ab_m_s, ag_s_num, ab_s_num, ag_m_s_num, ab_m_s_num, itera, correct_interaction, fold)
-            #correct_label = correct_interaction.to('cpu').data.numpy()
-            #predicted_label = predicted_interaction.to('cpu').data.numpy()
             return correct_interaction, predicted_interaction
 
 
@@ -427,7 +355,6 @@ def pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device):
     ag_s_new = torch.zeros((N, ag_s_len, 40), device=device)
     i = 0
     for ag in ag_s:
-        #ag = ag.astype(float)
         ag = torch.tensor(ag)
         a_len = ag.shape[0]
         ag_s_new[i, :a_len, :] = ag
@@ -435,7 +362,6 @@ def pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device):
     ab_s_new = torch.zeros((N, ab_s_len, 40), device=device)
     i = 0
     for ab in ab_s:
-        #ab = ab.astype(float)
         ab = torch.tensor(ab)
         a_len = ab.shape[0]
         ab_s_new[i, :a_len, :] = ab
@@ -444,7 +370,6 @@ def pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device):
     ag_m_s_new = torch.zeros((N, ag_m_s_len, 40), device=device)
     i = 0
     for agm in ag_m_s:
-        #ag = ag.astype(float)
         agm = torch.tensor(agm)
         a_len = agm.shape[0]
         ag_m_s_new[i, :a_len, :] = agm
@@ -452,7 +377,6 @@ def pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device):
     ab_m_s_new = torch.zeros((N, ab_m_s_len, 40), device=device)
     i = 0
     for abm in ab_m_s:
-        #ab = ab.astype(float)
         abm = torch.tensor(abm)
         a_len = abm.shape[0]
         ab_m_s_new[i, :a_len, :] = abm
@@ -471,7 +395,6 @@ def pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device):
 class Trainer(object):
     def __init__(self, model, lr, weight_decay, batch):
         self.model = model
-        # w - L2 regularization ; b - not L2 regularization
         weight_p, bias_p = [], []
         for p in self.model.parameters():
             if p.dim() > 1:
@@ -481,12 +404,11 @@ class Trainer(object):
                 bias_p += [p]
             else:
                 weight_p += [p]
-        # self.optimizer = optim.Adam([{'params': weight_p, 'weight_decay': weight_decay}, {'params': bias_p, 'weight_decay': 0}], lr=lr)
         self.optimizer_inner = RAdam([{'params': weight_p, 'weight_decay': weight_decay}, {'params': bias_p, 'weight_decay': 0}], lr=lr)
         self.optimizer = Lookahead(self.optimizer_inner, k=5, alpha=0.5)
         self.batch = batch
 
-    def train(self, dataset, device, itera, fold):
+    def train(self, dataset, device, epoch, fold, analysis_dir):
         self.model.train()
         N = len(dataset)
         i = 0
@@ -509,7 +431,7 @@ class Trainer(object):
             if i % self.batch == 0 or i == N:
                 iteration += 1
                 data_pack = pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, device)
-                loss, correct, predicted = self.model(data_pack, itera, fold)  # predictor.train()
+                loss, correct, predicted = self.model(data_pack)
                 correct = correct.view(1,-1)
                 predicted = predicted.view(1,-1)
                 correct_labels = torch.cat([correct_labels,correct], dim=-1)
@@ -517,17 +439,9 @@ class Trainer(object):
                 train_correct_fold = torch.cat([train_correct_fold,correct], dim=-1)
                 train_predict_fold = torch.cat([train_predict_fold,predicted], dim=-1)
                 lo.append(loss)
-                # loss = loss / self.batch
                 loss.backward()
                 
-                #for name, weight in self.model.named_parameters():
-                    # print("weight:", weight)
-                    #if weight.requires_grad:
-                        # print("weight:", weight.grad)
-                        #print("weight.grad:", weight.grad.min(), weight.grad.max())  #weight.grad.mean(), 
-
                 ag_s, ab_s, ag_m_s, ab_m_s, labels = [], [], [], [], []
-                # torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
             else:
@@ -538,7 +452,6 @@ class Trainer(object):
         loss_train = sum(lo)/iteration
         return loss_train, train_correct_fold, train_predict_fold
 
-
 def get_corr(fake_Y, Y):
     fake_Y, Y = fake_Y.reshape(-1), Y.reshape(-1)
     fake_Y_mean, Y_mean = torch.mean(fake_Y.float()), torch.mean(Y.float())
@@ -546,12 +459,11 @@ def get_corr(fake_Y, Y):
         torch.sqrt(torch.sum((fake_Y - fake_Y_mean) ** 2)) * torch.sqrt(torch.sum((Y - Y_mean) ** 2)))
     return corr
 
-
 class Tester(object):
     def __init__(self, model):
         self.model = model
 
-    def test(self, dataset, itera, fold):
+    def test(self, dataset, epoch, fold, analysis_dir):
         self.model.eval()
         N = len(dataset)
         device = torch.device('cpu')
@@ -567,28 +479,26 @@ class Tester(object):
                 ab_m_s.append(abm)
                 labels.append(label)
                 data = pack(ag_s, ab_s, ag_m_s, ab_m_s, labels, self.model.device)
-                correct, predicted = self.model(data, itera, fold, train=False)
+                correct, predicted = self.model(data, train=False)
                 correct = correct.view(1,-1)
                 predicted = predicted.view(1,-1)
                 T = torch.cat([T,correct], dim=-1)
                 Y = torch.cat([Y,predicted], dim=-1)
         T = T.squeeze()
         Y = Y.squeeze()
-        print('true:', T)
-        print('predict:', Y)
-        pccs = get_corr(T,Y)  # an epoch's val's pccs
+        pccs = get_corr(T,Y)
         mae = mean_absolute_error(T, Y)
         mse = mean_squared_error(T, Y)
         rmse = sqrt(mean_squared_error(T, Y))
         r2 = r2_score(T, Y)
         Loss = nn.MSELoss()
-        loss = Loss(T, Y)  # an epoch's val's loss
+        loss = Loss(T, Y)
         return pccs, mae, mse, rmse, r2, loss, T, Y
 
     def save_pccs(self,pccs,filename):
         with open(filename, 'a') as f:
-            f.write('\t'.join(map(str,pccs)) + '\n')
+            f.write('	'.join(map(str,pccs)) + '
+')
 
     def save_model(self, model, filename):
         torch.save(model.state_dict(), filename)
-

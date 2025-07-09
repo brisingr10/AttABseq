@@ -1,0 +1,17 @@
+name: attabseq
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - pytorch
+  - torchvision
+  - numpy
+  - pandas
+  - scikit-learn
+  - scipy
+  - seaborn
+  - matplotlib
+  - networkx
+  - xarray

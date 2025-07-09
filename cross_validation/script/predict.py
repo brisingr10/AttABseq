@@ -1,149 +1,181 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+import argparse
 import pandas as pd
 import torch
 from numpy import *
 import numpy as np
 import random
-import time
-from model import *
-import timeit
-import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold
-#from data import diction,dataset
-import os
-import argparse
+from model import Encoder, Decoder, Predictor, SelfAttention, PositionwiseFeedforward, DecoderLayer, pack
 
+class feature(object):
+    def __init__(self,seq, dataset_name):
+        self.seq = seq
+        self.dataset_name = dataset_name
 
+    def seq2onehot(self):
+        aas = {'X':0,'A':1,'R':2,'N':3,'D':4,'C':5,
+               'Q':6,'E':7,'G':8,'H':9,'I':10,
+               'L':11,'K':12,'M':13,'F':14,'P':15,
+               'S':16,'T':17,'W':18,'Y':19,'V':20}
+        seq_onehot = np.zeros((len(self.seq),len(aas)))
+        for i, aa in enumerate(self.seq[:]):
+            if aa not in aas:
+                aa = 'X'
+            seq_onehot[i, (aas[aa])] = 1
+        seq_onehot = seq_onehot[:,1:]
+        return seq_onehot
 
-def load_tensor(file_name, dtype):
-    return [dtype(d).to(device) for d in np.load(file_name + '.npy', allow_pickle=True)]
+    def seq2pssm(self):
+        fasta_file = f'{self.dataset_name}aa.fasta'
+        output_file = f'{self.dataset_name}.txt'
+        pssm_file = f'{self.dataset_name}aa.pssm'
+        with open(fasta_file, 'w') as f:
+            f.write('>name\n')
+            f.write(self.seq)
+        f.close()
+        # It is assumed that the blast tool is in the parent directory of the script directory.
+        os.system(f'../ncbi-blast-2.12.0+/bin/psiblast -query {fasta_file} -db ../ncbi-blast-2.12.0+/bin/swissprot -num_iterations 3 -out {output_file} -out_ascii_pssm {pssm_file}')
+        with open(pssm_file, 'r') as inputpssm:
+            count = 0
+            pssm_matrix = []
+            for eachline in inputpssm:
+                count += 1
+                if count <= 3:
+                    continue
+                if not len(eachline.strip()):
+                    break
+                col = eachline.strip()
+                col = col.split(' ')
+                col = [x for x in col if x != '']
+                col = col[2:22]
+                col = [int(x) for x in col]
+                oneline = col
+                pssm_matrix.append(oneline)
+            seq_pssm = np.array(pssm_matrix)
+        return seq_pssm
 
+def all_feature(ls, dataset_name):
+    all = []
+    for s in ls:
+        if s==s:
+            f1 = feature(s, dataset_name).seq2onehot()
+            f2 = feature(s, dataset_name).seq2pssm()
+            f = np.concatenate((f1,f2),axis=1)
+            all.append(f)
+        else:
+            all.append(s)
+    return all
 
 if __name__ == "__main__":
-    SEED = 42
+    parser = argparse.ArgumentParser(description='Predict with AttABseq model.')
+    parser.add_argument('--model_path', type=str, help='Path to the trained model file.', required=True)
+    parser.add_argument('--dataset_path', type=str, help='Path to the dataset CSV file.', required=True)
+    parser.add_argument('--output_path', type=str, help='Path to save the prediction results.', required=True)
+    args = parser.parse_args()
+
+    model_path = args.model_path
+    dataset_path = args.dataset_path
+    output_path = args.output_path
+    dataset_name = os.path.basename(dataset_path).split('.')[0]
+
+    SEED = 1234
     random.seed(SEED)
     torch.manual_seed(SEED)
-    # torch.backends.cudnn.deterministic = True
 
-    """CPU or GPU"""
     if torch.cuda.is_available():
-        device = torch.device('cuda:0')
+        device = torch.device('cuda')
         print('The code uses GPU...')
     else:
         device = torch.device('cpu')
         print('The code uses CPU!!!')
 
-    """Load preprocessed data."""
+    csv = pd.read_csv(dataset_path)
+    
+    if 'antibody_light_seq' in csv.columns:
+        abls = csv['antibody_light_seq'].tolist()
+        abhs = csv['antibody_heavy_seq'].tolist()
+        agas = csv['antigen_a_seq'].tolist()
+        agbs = csv['antigen_b_seq'].tolist()
+        abls_m = csv['antibody_light_seq_mut'].tolist()
+        abhs_m = csv['antibody_heavy_seq_mut'].tolist()
+        agas_m = csv['antigen_a_seq_mut'].tolist()
+        agbs_m = csv['antigen_b_seq_mut'].tolist()
+        labels = csv['ddG'].tolist()
 
-    dir_input = ('your data')
-    antibodies = np.load('your pssm numpy file',allow_pickle=True)
-    antibodies_mut = np.load('your pssm numpy file',allow_pickle=True)
-    antigens = np.load('your pssm numpy file',allow_pickle=True)
-    antigens_mut = np.load('your pssm numpy file',allow_pickle=True)
-    interactions = np.load('your pssm numpy file',allow_pickle=True)
+        antibodies_l = all_feature(abls, dataset_name)
+        antibodies_h = all_feature(abhs, dataset_name)
+        antigens_a = all_feature(agas, dataset_name)
+        antigens_b = all_feature(agbs, dataset_name)
+        antibodies_l_mut = all_feature(abls_m, dataset_name)
+        antibodies_h_mut = all_feature(abhs_m, dataset_name)
+        antigens_a_mut = all_feature(agas_m, dataset_name)
+        antigens_b_mut = all_feature(agbs_m, dataset_name)
 
+        antibodies = []
+        antigens = []
+        antibodies_mut = []
+        antigens_mut = []
+        for i in range(len(antibodies_l)):
+            if isinstance(antibodies_h[i],float):
+                antibodies.append(antibodies_l[i])
+            else:
+                antibodies.append(np.concatenate((antibodies_l[i],antibodies_h[i]),axis=0))
+            if isinstance(antigens_b[i],float):
+                antigens.append(antigens_a[i])
+            else:
+                antigens.append(np.concatenate((antigens_a[i],antigens_b[i]),axis=0))
+            if isinstance(antibodies_h_mut[i],float):
+                antibodies_mut.append(antibodies_l_mut[i])
+            else:
+                antibodies_mut.append(np.concatenate((antibodies_l_mut[i],antibodies_h_mut[i]),axis=0))
+            if isinstance(antigens_b_mut[i],float):
+                antigens_mut.append(antigens_a_mut[i])
+            else:
+                antigens_mut.append(np.concatenate((antigens_a_mut[i],antigens_b_mut[i]),axis=0))
+    else:
+        ab = csv['a'].tolist()
+        ag = csv['b'].tolist()
+        ab_m = csv['a_mut'].tolist()
+        ag_m = csv['b_mut'].tolist()
+        labels = csv['ddG'].tolist()
 
-    """ create model ,trainer and tester """
-    antibody_dim = 20
-    # protein_dim = 100
-    antigen_dim = 20
-    # atom_dim = 34
+        antibodies = all_feature(ab, dataset_name)
+        antigens = all_feature(ag, dataset_name)
+        antibodies_mut = all_feature(ab_m, dataset_name)
+        antigens_mut = all_feature(ag_m, dataset_name)
+
+    interactions = np.array(labels)
+
+    dataset = list(zip(antigens, antibodies, antigens_mut, antibodies_mut, interactions))
+
+    antibody_dim = 40
+    antigen_dim = 40
     hid_dim = 256
-    n_layers = 3  #3
+    n_layers = 3
     n_heads = 8
     pf_dim = 64
     dropout = 0.1
-    batch = 8  # 原64
-    lr = 0.00001
-    weight_decay = 1e-4
-    decay_interval = 5  # 每5轮观察一次，判断是否改变lr。
-    lr_decay = 1  # 之前从1改到了0.9。但是我需要对学习率作一个动态变化。
-    iteration = 100
-    kernel_size = 7  # 7
-
+    kernel_size = 3
 
     encoder = Encoder(antibody_dim, hid_dim, n_layers, kernel_size, dropout, device)
     decoder = Decoder(antigen_dim, hid_dim, n_layers, n_heads, pf_dim, DecoderLayer, SelfAttention, PositionwiseFeedforward, dropout, device)
-
+    
     model = Predictor(encoder, decoder, device)
-    model.load_state_dict(torch.load("model"))
+    model.load_state_dict(torch.load(model_path))
     model.to(device)
-    #if is_distributed:
-        #print("start init process group")
-        # device_ids will include all GPU devices by default
-        #model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
-        #print("end init process group")
-    trainer = Trainer(model, lr, weight_decay, batch)
-    tester = Tester(model)
+    model.eval()
 
+    predictions = []
+    with torch.no_grad():
+        for data in dataset:
+            ag_s, ab_s, ag_m_s, ab_m_s, correct_interaction = [data]
+            data_pack = pack([ag_s], [ab_s], [ag_m_s], [ab_m_s], [correct_interaction], device)
+            predicted_interaction, _, _, _, _ = model.forward(*data_pack[:-1])
+            predictions.append(predicted_interaction.item())
 
-    """Start training."""
-    print('Training...')
+    results = pd.DataFrame({'true_ddG': interactions, 'predicted_ddG': predictions})
+    results.to_csv(output_path, index=False)
 
-    best_pearson = 0
-    
-    
-
-    """Output files."""
-    file_PCCS = '../output/result/RECORD.txt'
-    file_model = '../output/model/model'
-    #PCCS = ('Epoch\tTime(sec)\tLoss_train\tLoss_val\tpearson')
-    PCCS = ('Epoch\tTime(sec)\tLoss_val\tpearson')
-    print(PCCS)
-
-    with open(file_PCCS, 'w') as f:
-        f.write(PCCS + '\n')
-
-
-    start = timeit.default_timer()
-
-    for epoch in range(1, iteration + 1):
-        
-        train_idx = [i for i in range(558)]
-        train_idx = np.array(train_idx)
-        val_idx = [j for j in range(645)[:]]
-        val_idx = np.array(val_idx)
-        print(val_idx,len(val_idx))
-        
-        np.random.shuffle(train_idx)
-        np.random.shuffle(val_idx)
-        
-        antigens_train, antigens_val = np.array(antigens)[train_idx], np.array(antigens)[val_idx]  # ag
-        antibodies_train, antibodies_val = np.array(antibodies)[train_idx], np.array(antibodies)[val_idx]  # ab
-        antigens_mut_train, antigens_mut_val = np.array(antigens_mut)[train_idx], np.array(antigens_mut)[val_idx]  # ag_mut
-        antibodies_mut_train, antibodies_mut_val = np.array(antibodies_mut)[train_idx], np.array(antibodies_mut)[val_idx]  # ab_mut
-        interactions_train, interactions_val = np.array(interactions)[train_idx], np.array(interactions)[val_idx]  # Y
-        
-        dataset_train = list(zip(antigens_train, antibodies_train, antigens_mut_train, antibodies_mut_train, interactions_train))
-        #dataset_train = torch.utils.data.DataLoader(dataset_train, sampler=torch.utils.data.distributed.DistributedSampler(dataset_train, num_replicas=ngpus_per_node, rank=0))
-        dataset_val = list(zip(antigens_val, antibodies_val, antigens_mut_val, antibodies_mut_val, interactions_val))
-        #dataset_val = torch.utils.data.DataLoader(dataset_val, sampler=torch.utils.data.distributed.DistributedSampler(dataset_val, num_replicas=ngpus_per_node, rank=0))
-
-        #loss_train_fold, y_train_true, y_train_predict = trainer.train(dataset_train, device, epoch)  # numpy arrays record for an epoch loss.
-        pccs_val, loss_val_fold, y_val_true, y_val_predict = tester.test(dataset_val, epoch)  # pccs_dev && loss_val_fold are for an epoch
-
-        end = timeit.default_timer()
-        time = end - start
-
-        #PCCS = [epoch, time, loss_train_fold.tolist(), loss_val_fold.tolist(), pccs_val.tolist()]
-        PCCS = [epoch, time, loss_val_fold.tolist(), pccs_val.tolist()]
-        tester.save_pccs(PCCS, file_PCCS)
-            
-            
-        #if pccs_val > best_pearson:
-            #tester.save_model(model, file_model)  # 根据pearson系数的情况保存模型。
-            #best_pearson = pccs_val
-
-        print('\t'.join(map(str, PCCS)))
-    #print(apple)  #SHOUDONGTIAOTING
-            
-
-        #fold_train = mean(loss_train_ls_fold)
-        #fold_val = mean(loss_val_ls_fold)
-        #loss_train_ls.append(fold_train)
-        #loss_val_ls.append(fold_val)
-
-    #print(loss_train_ls)
-    #print(loss_val_ls)
-
-
+    print(f'Predictions saved to {output_path}')
